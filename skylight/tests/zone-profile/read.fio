@@ -1,0 +1,12 @@
+[global]
+readwrite=read
+direct=1
+ioengine=sync
+blocksize=1m
+
+log_avg_msec=10
+write_bw_log=seq-read
+write_lat_log=seq-read
+write_iops_log=seq-read
+
+[job]

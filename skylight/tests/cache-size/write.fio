@@ -1,0 +1,7 @@
+[global]
+readwrite=randwrite
+direct=1
+ioengine=libaio
+runtime=30m
+
+[job]

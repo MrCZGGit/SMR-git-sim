@@ -1,0 +1,10 @@
+[global]
+readwrite=write:4k
+blocksize=4k
+
+direct=1
+ioengine=sync
+log_offset=1
+number_ios=512
+
+[job]

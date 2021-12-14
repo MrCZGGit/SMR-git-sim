@@ -1,0 +1,9 @@
+[global]
+direct=1
+ioengine=sync
+log_offset=1
+replay_no_stall=1
+
+write_lat_log=replay
+
+[job]

@@ -1,0 +1,134 @@
+################################################################################
+#
+# Fast operations -- these operations complete with a simple remap of the
+# initial sector.  They do not exercise most of the code paths inside the
+# target.
+#
+################################################################################
+
+# Before any writes, reads should go to unmapped.
+r _ 0,r _ 1,r _ 2,r _ 3,r _ 4,r _ 5,r _ 6,r _ 7,r _ 8,r _ 9,r _ 10,r _ 11:r 0 1,r 1 1,r 2 1,r 3 1,r 4 1,r 5 1,r 6 1,r 7 1,r 8 1,r 9 1,r 10 1,r 11 1
+
+# Read all of blocks in a single read operation.
+r ____________ 0:r 0 12
+
+# Write as much as possible without causing GC, one block at a time.  Also
+# verify the contents.
+w a 0,w b 1,w c 2,w d 3,w e 4,w f 5,r a 0,r b 1,r c 2,r d 3,r e 4,r f 5:w 12 1,w 13 1,w 14 1,w 15 1,w 16 1,w 17 1,r 12 1,r 13 1,r 14 1,r 15 1,r 16 1,r 17 1
+
+# Write as much as possible without causing GC, in as big chunks as possible.
+# Also verify the contents.
+w aaa 0,w bbb 3,r aaa 0,r bbb 3:w 12 3,w 15 3,r 12 3,r 15 3
+
+# Write as much as possible without causing GC, one block at a time, for
+# non-contiguous bands.  Also verify the contents.
+w a 3,w b 4,w c 5,w d 6,w e 7,w f 8,r a 3,r b 4,r c 5,r d 6,r e 7,r f 8:w 15 1,w 16 1,w 17 1,w 12 1,w 13 1,w 14 1,r 15 1,r 16 1,r 17 1,r 12 1,r 13 1,r 14 1
+
+# # Write as much as possible without causing GC, in as big chunks as possible,
+# # for non-contiguous bands.  Also verify the contents.
+w aaa 3,w bbb 6,r aaa 3,r bbb 6:w 15 3,w 12 3,r 15 3,r 12 3
+
+################################################################################
+#
+# Slow operations -- these operations break contiguity therefore cannot complete
+# with a remap.  So we get to exercise the code that splits non-contiguous bios.
+# The operations here do not cause GC.
+#
+################################################################################
+
+# Write to the beginning of the band and read all of the band, one block.
+w a 0,r a__ 0:w 12 1,r 12 1,r 1 2
+
+# Write to the beginning of the band and read all of the band, two blocks.
+w ab 0,r ab_ 0:w 12 2,r 12 2,r 2 1
+
+# Write to the end of the band and read all of the band, one block.
+w a 2,r __a 0:w 12 1,r 0 2,r 12 1
+
+# Write to the end of the band and read all of the band, two blocks.
+w ab 1,r _ab 0:w 12 2,r 0 1,r 12 2
+
+# Write a single block to the middle of the band and read all of the band.
+w a 1,r _a_ 0:w 12 1,r 0 1,r 12 1,r 2 1
+
+# Write to the beginning of every band and read all disk.
+w a 0,w b 3,w c 6,w d 9,r a__b__c__d__ 0:w 12 1,w 15 1,w 13 1,w 16 1,r 12 1,r 1 2,r 15 1,r 4 2,r 13 1,r 7 2,r 16 1,r 10 2
+
+# Write to the middle of every band and read all disk.
+w a 1,w b 4,w c 7,w d 10,r _a__b__c__d_ 0:w 12 1,w 15 1,w 13 1,w 16 1,r 0 1,r 12 1,r 2 2,r 15 1,r 5 2,r 13 1,r 8 2,r 16 1,r 11 1
+
+# Write to the end of every band and read all disk.
+w a 2,w b 5,w c 8,w d 11,r __a__b__c__d 0:w 12 1,w 15 1,w 13 1,w 16 1,r 0 2,r 12 1,r 3 2,r 15 1,r 6 2,r 13 1,r 9 2,r 16 1
+
+# Write from left to right diagonal to first 3 bands, read all disk.
+w a 0,w b 4,w c 8,r a___b___c___ 0:w 12 1,w 15 1,w 13 1,r 12 1,r 1 3,r 15 1,r 5 3,r 13 1,r 9 3
+
+# Write from left to right diagonal to second 3 bands, read all disk.
+w a 3,w b 7,w c 11,r ___a___b___c 0:w 15 1,w 12 1,w 16 1,r 0 3,r 15 1,r 4 3,r 12 1,r 8 3,r 16 1
+
+# Write from right to left diagonal to first 3 bands, read all disk.
+w a 2,w b 4,w c 6,r __a_b_c_____ 0:w 12 1,w 15 1,w 13 1,r 0 2,r 12 1,r 3 1,r 15 1,r 5 1,r 13 1,r 7 5
+
+# Write from right to left diagonal to second 3 bands, read all disk.
+w a 5,w b 7,w c 9,r _____a_b_c__ 0:w 15 1,w 12 1,w 16 1,r 0 5,r 15 1,r 6 1,r 12 1,r 8 1,r 16 1,r 10 2
+
+# Fill every band in isolation and read all disk.
+w abc 0,r abc_________ 0:w 12 3,r 12 3,r 3 9
+w abc 3,r ___abc______ 0:w 15 3,r 0 3,r 15 3,r 6 6
+w abc 6,r ______abc___ 0:w 12 3,r 0 6,r 12 3,r 9 3
+w abc 9,r _________abc 0:w 15 3,r 0 9,r 15 3
+
+# Fill every two bands without causing GC and read all disk.
+w abc 0,w def 3,r abcdef______ 0:w 12 3,w 15 3,r 12 6,r 6 6
+w def 3,w abc 0,r abcdef______ 0:w 15 3,w 12 3,r 12 6,r 6 6
+w abc 0,w def 9,r abc______def 0:w 12 3,w 15 3,r 12 3,r 3 6,r 15 3
+w def 9,w abc 0,r abc______def 0:w 15 3,w 12 3,r 12 3,r 3 6,r 15 3
+w abc 3,w def 6,r ___abcdef___ 0:w 15 3,w 12 3,r 0 3,r 15 3,r 12 3,r 9 3
+w def 6,w abc 3,r ___abcdef___ 0:w 12 3,w 15 3,r 0 3,r 15 3,r 12 3,r 9 3
+w abc 6,w def 9,r ______abcdef 0:w 12 3,w 15 3,r 0 6,r 12 6
+w def 9,w abc 6,r ______abcdef 0:w 15 3,w 12 3,r 0 6,r 12 6
+
+# Write cross-band, read back.
+w abc 1,r abc 1:w 12 2,w 15 1,r 12 2,r 15 1
+w abc 2,r abc 2:w 12 1,w 15 2,r 12 1,r 15 2
+
+################################################################################
+#
+# Single-band GC operations -- these operations do everything above, plus they
+# cause GC that results in RMW of a single band.
+#
+################################################################################
+
+# Simplest GC test.  Fill each band one block at a time and do another block
+# write at the first block of the band.
+w a 0,w b 1,w c 2,w d 0,r dbc_ 0:w 12 1,w 13 1,w 14 1,r 0 1,r 1 1,r 2 1,r 12 1,r 13 1,r 14 1,w 0 1,w 1 1,w 2 1,w 12 1,r 12 1,r 1 3
+w a 3,w b 4,w c 5,w d 3,r ___dbc_ 0:w 15 1,w 16 1,w 17 1,r 3 1,r 4 1,r 5 1,r 15 1,r 16 1,r 17 1,w 3 1,w 4 1,w 5 1,w 15 1,r 0 3,r 15 1,r 4 3
+w a 6,w b 7,w c 8,w d 6,r ______dbc_ 0:w 12 1,w 13 1,w 14 1,r 6 1,r 7 1,r 8 1,r 12 1,r 13 1,r 14 1,w 6 1,w 7 1,w 8 1,w 12 1,r 0 6,r 12 1,r 7 3
+w a 9,w b 10,w c 11,w d 9,r _________dbc 0:w 15 1,w 16 1,w 17 1,r 9 1,r 10 1,r 11 1,r 15 1,r 16 1,r 17 1,w 9 1,w 10 1,w 11 1,w 15 1,r 0 9,r 15 1,r 10 2
+
+# Same as above, but fill the band at once.
+w abc 0,w d 0,r dbc_ 0:w 12 3,r 0 1,r 1 1,r 2 1,r 12 1,r 13 1,r 14 1,w 0 1,w 1 1,w 2 1,w 12 1,r 12 1,r 1 3
+w abc 3,w d 3,r ___dbc_ 0:w 15 3,r 3 1,r 4 1,r 5 1,r 15 1,r 16 1,r 17 1,w 3 1,w 4 1,w 5 1,w 15 1,r 0 3,r 15 1,r 4 3
+w abc 6,w d 6,r ______dbc_ 0:w 12 3,r 6 1,r 7 1,r 8 1,r 12 1,r 13 1,r 14 1,w 6 1,w 7 1,w 8 1,w 12 1,r 0 6,r 12 1,r 7 3
+w abc 9,w d 9,r _________dbc 0:w 15 3,r 9 1,r 10 1,r 11 1,r 15 1,r 16 1,r 17 1,w 9 1,w 10 1,w 11 1,w 15 1,r 0 9,r 15 1,r 10 2
+
+# Fill each band at once, then write to another band that shares the cache band
+# and read all disk.
+w abc 0,w d 6,r abc___d_ 0:w 12 3,r 0 1,r 1 1,r 2 1,r 12 1,r 13 1,r 14 1,w 0 1,w 1 1,w 2 1,w 12 1,r 0 6,r 12 1,r 7 1
+w abc 3,w d 9,r ___abc___d__ 0:w 15 3,r 3 1,r 4 1,r 5 1,r 15 1,r 16 1,r 17 1,w 3 1,w 4 1,w 5 1,w 15 1,r 0 9,r 15 1,r 10 2
+
+################################################################################
+#
+# Multi-band GC operations -- like above, but they cause GC that results in RMW
+# of multiple bands.
+#
+################################################################################
+
+# Write enough to two bands sharing the cache band to cause GC and then read the
+# whole disk.
+w b 8,w a 1,w c 6,w x 0,r xa____c_b___ 0:w 12 1,w 13 1,w 14 1,r 0 1,r 1 1,r 2 1,r 13 1,w 0 1,w 1 1,w 2 1,r 6 1,r 7 1,r 8 1,r 14 1,r 12 1,w 6 1,w 7 1,w 8 1,w 12 1,r 12 1,r 1 11
+w x 10,w ab 3,w z 9,r ___ab____zx_ 0:w 15 1,w 16 2,r 3 1,r 4 1,r 5 1,r 16 1,r 17 1,w 3 1,w 4 1,w 5 1,r 9 1,r 10 1,r 11 1,r 15 1,w 9 1,w 10 1,w 11 1,w 15 1,r 0 9,r 15 1,r 10 2
+
+# Write to two bands sharing the cache band, then do another band-crossing write
+# that will cause RMW of two bands and a write to another band.
+w a 4,w dx 9,w fo 5,r ____afo__dx_ 0:w 15 1,w 16 2,r 3 1,r 4 1,r 5 1,r 15 1,w 3 1,w 4 1,w 5 1,r 9 1,r 10 1,r 11 1,r 16 1,r 17 1,w 9 1,w 10 1,w 11 1,w 15 1,w 12 1,r 0 5,r 15 1,r 12 1,r 7 5

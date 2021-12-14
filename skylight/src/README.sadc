@@ -1,0 +1,51 @@
+To install the emulator:
+
+ 1) Compile and install the module:
+
+   $ make
+       make -C /lib/modules/3.13.0-24-generic/build M=/tmp/shingle modules
+       make[1]: Entering directory `/usr/src/linux-headers-3.13.0-24-generic'
+         CC [M]  /tmp/shingle/dm-sadc.o
+         Building modules, stage 2.
+         MODPOST 1 modules
+         CC      /tmp/shingle/dm-sadc.mod.o
+         LD [M]  /tmp/shingle/dm-sadc.ko
+       make[1]: Leaving directory `/usr/src/linux-headers-3.13.0-24-generic'
+
+    $ sudo insmod dm-sadc.ko
+
+ 2) Specify the shingled disk parameters to dm.py script to produce a correct
+    device mapper table entry.  The following example emulates a shingled disk
+    on top of /dev/sdb, using 10 GiB of its size, with 10 MiB tracks and a band
+    consisting of 10 tracks.  One percent of 10 GiB is used as cache region.
+
+    $ ./dm.py /dev/sdb $((10*1024*1024*1024)) $((1024*1024)) 10 1 | sudo dmsetup create sadc
+
+    Running this command will produce the following entries in your kernel log:
+
+      bio: create slab <bio-1> at 1
+      device-mapper: sadc: Destructing...
+      device-mapper: sadc: Constructing...
+      device-mapper: sadc: Disk size: 10.0 GiB
+      device-mapper: sadc: Band size: 10.0 MiB
+      device-mapper: sadc: Band size: 2560 pbas
+      device-mapper: sadc: Total number of bands: 1024
+      device-mapper: sadc: Number of cache bands: 10
+      device-mapper: sadc: Cache size: 100 MiB
+      device-mapper: sadc: Number of usable bands: 1010
+      device-mapper: sadc: Usable disk size: 9.86 GiB
+      device-mapper: sadc: Number of usable pbas: 2585600
+      device-mapper: sadc: Wasted disk size: 40.0 MiB
+
+
+ 3) This will generate a new block device called /dev/mapper/sadc that you can
+    use as a regular disk, e.g. the following commands format and mount it as
+    ext4 partition:
+
+    $ sudo mkfs.ext4 -b 4096 /dev/mapper/sadc
+    $ sudo mount /dev/mapper/sadc /mnt
+
+ 4) To remove the target, you need to make sure it is not used and then run the
+    following command:
+
+    $ sudo dmsetup remove sadc

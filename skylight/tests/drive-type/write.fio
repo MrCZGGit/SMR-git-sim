@@ -1,0 +1,13 @@
+[global]
+direct=1
+ioengine=sync
+log_offset=1
+replay_no_stall=1
+
+read_iolog=write.trace
+
+write_bw_log=rand-write
+write_lat_log=rand-write
+write_iops_log=rand-write
+
+[job]

@@ -1,0 +1,7 @@
+[global]
+readwrite=write
+blocksize=4k
+direct=1
+ioengine=sync
+
+[job]
